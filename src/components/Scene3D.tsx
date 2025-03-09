@@ -1,6 +1,6 @@
-
 import { useEffect, useRef } from 'react';
 import * as BABYLON from '@babylonjs/core';
+import { GridMaterial } from '@babylonjs/materials';
 import '@babylonjs/loaders';
 import { loadURDFRobot } from '../utils/urdfLoader';
 
@@ -52,7 +52,7 @@ const Scene3D = ({ onSceneReady }: Scene3DProps) => {
         { width: gridSize, height: gridSize, subdivisions: 20 },
         scene
       );
-      const gridMaterial = new BABYLON.GridMaterial("gridMaterial", scene);
+      const gridMaterial = new GridMaterial("gridMaterial", scene);
       gridMaterial.majorUnitFrequency = 5;
       gridMaterial.minorUnitVisibility = 0.3;
       gridMaterial.gridRatio = 1;

@@ -1,13 +1,13 @@
 
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Settings, Home, Move, Tool } from "lucide-react";
+import { Settings, Home, Move, Wrench } from "lucide-react";
 
 const NavigationPanel = () => {
   const navItems = [
     { icon: Home, label: "Overview" },
     { icon: Move, label: "Motion" },
-    { icon: Tool, label: "Tools" },
+    { icon: Wrench, label: "Tools" },
     { icon: Settings, label: "Settings" },
   ];
 

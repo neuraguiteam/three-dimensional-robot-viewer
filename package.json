@@ -13,6 +13,7 @@
   "dependencies": {
     "@babylonjs/core": "^6.37.1",
     "@babylonjs/loaders": "^6.37.1",
+    "@babylonjs/materials": "^6.49.0",
     "@hookform/resolvers": "^3.9.0",
     "@radix-ui/react-accordion": "^1.2.0",
     "@radix-ui/react-alert-dialog": "^1.1.1",
