@@ -79,11 +79,17 @@ export async function loadURDFRobot(
         visualNode.rotationQuaternion = rpyToQuaternion(visual.rpy[0], visual.rpy[1], visual.rpy[2]);
         visualNode.parent = linkNode;
 
+        // Fix the mesh path by correctly joining the baseUrl and meshPath
         const meshPath = visual.filename.replace('../', '');
         const fullPath = `${baseUrl}/${meshPath}`;
 
         if (!meshCache[fullPath]) {
-          meshCache[fullPath] = BABYLON.SceneLoader.ImportMeshAsync("", baseUrl, meshPath, scene);
+          // Split the path into rootUrl and sceneFilename for SceneLoader
+          const lastSlashIndex = fullPath.lastIndexOf('/');
+          const rootUrl = fullPath.substring(0, lastSlashIndex + 1);
+          const sceneFilename = fullPath.substring(lastSlashIndex + 1);
+          
+          meshCache[fullPath] = BABYLON.SceneLoader.ImportMeshAsync("", rootUrl, sceneFilename, scene);
         }
 
         const loadPromise = meshCache[fullPath].then(result => {
@@ -113,3 +119,4 @@ export async function loadURDFRobot(
     throw error;
   }
 }
+
