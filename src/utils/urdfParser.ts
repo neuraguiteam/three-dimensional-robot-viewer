@@ -1,5 +1,4 @@
-
-import { URDFLink, URDFJoint } from './urdfTypes';
+import { URDFLink, URDFJoint, URDFLinkVisual } from './urdfTypes';
 
 export async function parseURDF(urdfText: string): Promise<{
   links: URDFLink[];
@@ -96,4 +95,3 @@ function parseAxis(jointEl: Element): [number, number, number] | undefined {
   }
   return undefined;
 }
-
