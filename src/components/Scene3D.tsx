@@ -63,7 +63,7 @@ const Scene3D = ({ onSceneReady }: Scene3DProps) => {
 
       // Load URDF Robot
       try {
-        await loadURDFRobot(scene, "urdf/robot/robot.urdf", "urdf/robot");
+        await loadURDFRobot(scene, "urdf/T12/T12.URDF", "urdf/T12");
       } catch (error) {
         console.error("Error loading URDF:", error);
       }
