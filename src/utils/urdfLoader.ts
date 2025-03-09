@@ -63,7 +63,9 @@ export async function loadURDFRobot(
     // Load and position meshes based on URDF
     for (const link of links) {
       if (link.visual && link.visual[0]?.geometry?.mesh?.filename) {
-        const meshPath = link.visual[0].geometry.mesh.filename;
+        // Fix the mesh path by removing the relative path component
+        const rawMeshPath = link.visual[0].geometry.mesh.filename;
+        const meshPath = rawMeshPath.replace('../', '');
         const meshUrl = `${baseUrl}/${meshPath}`;
         console.log('Loading mesh:', meshUrl);
 
