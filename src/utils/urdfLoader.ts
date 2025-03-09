@@ -1,6 +1,5 @@
 
 import * as BABYLON from '@babylonjs/core';
-import { parseString } from 'xml2js';
 
 interface JointInfo {
   name: string;
@@ -28,13 +27,6 @@ interface LinkInfo {
   }[];
 }
 
-interface URDFRobot {
-  robot: {
-    link: LinkInfo[];
-    joint: JointInfo[];
-  };
-}
-
 export async function loadURDFRobot(
   scene: BABYLON.Scene,
   urdfPath: string,
@@ -44,16 +36,25 @@ export async function loadURDFRobot(
     const response = await fetch(urdfPath);
     const urdfContent = await response.text();
 
-    const result = await new Promise<URDFRobot>((resolve, reject) => {
-      parseString(urdfContent, (err, result) => {
-        if (err) reject(err);
-        else resolve(result as URDFRobot);
-      });
-    });
+    // Use browser's built-in XML parser
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(urdfContent, "text/xml");
 
-    const robot = result.robot;
-    const links: LinkInfo[] = robot.link;
-    const joints: JointInfo[] = robot.joint;
+    // Parse links
+    const links: LinkInfo[] = Array.from(xmlDoc.getElementsByTagName('link')).map(link => ({
+      name: link.getAttribute('name') || '',
+      visual: Array.from(link.getElementsByTagName('visual')).map(visual => ({
+        origin: Array.from(visual.getElementsByTagName('origin')).map(origin => ({
+          xyz: origin.getAttribute('xyz') || '',
+          rpy: origin.getAttribute('rpy') || ''
+        }))[0],
+        geometry: Array.from(visual.getElementsByTagName('geometry')).map(geometry => ({
+          mesh: Array.from(geometry.getElementsByTagName('mesh')).map(mesh => ({
+            filename: mesh.getAttribute('filename') || ''
+          }))[0]
+        }))[0]
+      }))
+    }));
 
     // Create a root node for the robot
     const robotRoot = new BABYLON.TransformNode("robotRoot", scene);
@@ -61,9 +62,10 @@ export async function loadURDFRobot(
 
     // Load and position meshes based on URDF
     for (const link of links) {
-      if (link.visual && link.visual[0].geometry && link.visual[0].geometry[0].mesh) {
-        const meshPath = link.visual[0].geometry[0].mesh[0].filename[0];
+      if (link.visual && link.visual[0]?.geometry?.mesh?.filename) {
+        const meshPath = link.visual[0].geometry.mesh.filename;
         const meshUrl = `${baseUrl}/${meshPath}`;
+        console.log('Loading mesh:', meshUrl);
 
         try {
           const meshes = await BABYLON.SceneLoader.ImportMeshAsync("", "", meshUrl, scene);
@@ -72,7 +74,7 @@ export async function loadURDFRobot(
 
           // Apply transformations from URDF if available
           if (link.visual[0].origin) {
-            const origin = link.visual[0].origin[0];
+            const origin = link.visual[0].origin;
             if (origin.xyz) {
               const [x, y, z] = origin.xyz.split(' ').map(Number);
               mesh.position = new BABYLON.Vector3(x, y, z);
