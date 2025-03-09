@@ -25,6 +25,13 @@ interface LinkInfo {
         filename?: string;
       };
     };
+  }[];
+}
+
+interface URDFRobot {
+  robot: {
+    link: LinkInfo[];
+    joint: JointInfo[];
   };
 }
 
@@ -37,11 +44,10 @@ export async function loadURDFRobot(
     const response = await fetch(urdfPath);
     const urdfContent = await response.text();
 
-    // Use parseString with a Promise wrapper instead of util.promisify
-    const result = await new Promise((resolve, reject) => {
+    const result = await new Promise<URDFRobot>((resolve, reject) => {
       parseString(urdfContent, (err, result) => {
         if (err) reject(err);
-        else resolve(result);
+        else resolve(result as URDFRobot);
       });
     });
 
