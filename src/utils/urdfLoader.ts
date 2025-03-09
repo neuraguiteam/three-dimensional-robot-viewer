@@ -1,4 +1,3 @@
-
 import * as BABYLON from '@babylonjs/core';
 
 interface URDFLinkVisual {
@@ -37,13 +36,11 @@ async function parseURDF(urdfText: string): Promise<{
   const links: URDFLink[] = [];
   const joints: URDFJoint[] = [];
 
-  // Parse <link> elements
   const linkElems = xml.querySelectorAll("robot > link");
   linkElems.forEach((linkEl) => {
     const linkName = linkEl.getAttribute("name") || "unnamed_link";
     const visuals: URDFLinkVisual[] = [];
 
-    // For each <visual>
     linkEl.querySelectorAll("visual").forEach((visualEl) => {
       const meshEl = visualEl.querySelector("geometry > mesh");
       if (!meshEl) return;
@@ -54,6 +51,7 @@ async function parseURDF(urdfText: string): Promise<{
       
       let xyz: [number, number, number] = [0, 0, 0];
       let rpy: [number, number, number] = [0, 0, 0];
+      
       const originEl = visualEl.querySelector("origin");
       if (originEl) {
         const xyzStr = originEl.getAttribute("xyz") || "0 0 0";
@@ -73,7 +71,6 @@ async function parseURDF(urdfText: string): Promise<{
     links.push({ name: linkName, visuals });
   });
 
-  // Parse <joint> elements
   const jointElems = xml.querySelectorAll("robot > joint");
   jointElems.forEach((jointEl) => {
     const name = jointEl.getAttribute("name") || "unnamed_joint";
@@ -87,6 +84,7 @@ async function parseURDF(urdfText: string): Promise<{
 
     let xyz: [number, number, number] = [0, 0, 0];
     let rpy: [number, number, number] = [0, 0, 0];
+    
     const originEl = jointEl.querySelector("origin");
     if (originEl) {
       const xyzStr = originEl.getAttribute("xyz") || "0 0 0";
@@ -95,7 +93,7 @@ async function parseURDF(urdfText: string): Promise<{
       rpy = rpyStr.split(" ").map(Number) as [number, number, number];
     }
 
-    let axis: [number, number, number] | undefined = undefined;
+    let axis: [number, number, number] | undefined;
     const axisEl = jointEl.querySelector("axis");
     if (axisEl) {
       const axisStr = axisEl.getAttribute("xyz") || "0 0 0";
@@ -116,28 +114,21 @@ export async function loadURDFRobot(
   try {
     const response = await fetch(urdfPath);
     const urdfContent = await response.text();
-
-    // Parse URDF content
     const { links, joints } = await parseURDF(urdfContent);
 
-    // Create a root node for the robot
     const robotRoot = new BABYLON.TransformNode("robotRoot", scene);
-    robotRoot.rotation = new BABYLON.Vector3(0, 0, Math.PI/2); // +Z up orientation
+    robotRoot.rotation = new BABYLON.Vector3(0, 0, Math.PI/2);
 
-    // Create a map to store link nodes
     const linkMap: Record<string, BABYLON.TransformNode> = {};
     const jointMap: Record<string, BABYLON.TransformNode> = {};
 
-    // Create TransformNodes for all links
     links.forEach((link) => {
       const linkNode = new BABYLON.TransformNode(link.name, scene);
       linkMap[link.name] = linkNode;
 
-      // Load meshes for each visual
       link.visuals.forEach(async (visual, idx) => {
-        const localRoot = new BABYLON.TransformNode(`${link.name}_visual_${idx}`, scene);
+        const meshRoot = new BABYLON.TransformNode(`${link.name}_visual_${idx}`, scene);
         
-        // Fix the mesh path by removing '../'
         const meshPath = visual.filename.replace('../', '');
         const meshUrl = `${baseUrl}/${meshPath}`;
         
@@ -145,65 +136,57 @@ export async function loadURDFRobot(
           const result = await BABYLON.SceneLoader.ImportMeshAsync("", "", meshUrl, scene);
           const mesh = result.meshes[0];
           
-          // Apply visual transform
-          localRoot.position = new BABYLON.Vector3(visual.xyz[0], visual.xyz[1], visual.xyz[2]);
-          localRoot.rotationQuaternion = rpyToQuaternion(visual.rpy[0], visual.rpy[1], visual.rpy[2]);
+          meshRoot.position = new BABYLON.Vector3(visual.xyz[0], visual.xyz[1], visual.xyz[2]);
+          meshRoot.rotationQuaternion = rpyToQuaternion(visual.rpy[0], visual.rpy[1], visual.rpy[2]);
+          
           if (visual.scale) {
-            localRoot.scaling = new BABYLON.Vector3(visual.scale[0], visual.scale[1], visual.scale[2]);
+            meshRoot.scaling = new BABYLON.Vector3(visual.scale[0], visual.scale[1], visual.scale[2]);
           }
 
-          mesh.parent = localRoot;
-          localRoot.parent = linkNode;
+          mesh.parent = meshRoot;
+          meshRoot.parent = linkNode;
         } catch (error) {
-          console.error(`Error loading mesh for link ${link.name}:`, error);
+          console.error(`Failed to load mesh for link ${link.name}:`, error);
         }
       });
     });
 
-    // Create joint hierarchy
     joints.forEach((joint) => {
       const parentNode = linkMap[joint.parent];
       const childNode = linkMap[joint.child];
 
       if (!parentNode || !childNode) {
-        console.warn(`Skipping joint ${joint.name}; missing parent or child node.`);
+        console.warn(`Missing parent or child node for joint ${joint.name}`);
         return;
       }
 
-      // Create joint transform node
       const jointNode = new BABYLON.TransformNode(joint.name, scene);
       jointNode.position = new BABYLON.Vector3(joint.xyz[0], joint.xyz[1], joint.xyz[2]);
       jointNode.rotationQuaternion = rpyToQuaternion(joint.rpy[0], joint.rpy[1], joint.rpy[2]);
 
-      // Store joint metadata
       jointNode.metadata = {
         type: joint.type,
         axis: joint.axis
       };
 
-      // Setup hierarchy
       jointNode.parent = parentNode;
       childNode.parent = jointNode;
       
       jointMap[joint.name] = jointNode;
     });
 
-    // Find root links (those not used as children in any joint)
-    const allLinkNames = links.map(l => l.name);
-    const childLinkNames = joints.map(j => j.child);
-    const rootLinks = allLinkNames.filter(ln => !childLinkNames.includes(ln));
-
-    // Parent root links to the robot root
-    rootLinks.forEach(rootLinkName => {
-      const rootLink = linkMap[rootLinkName];
-      if (rootLink) {
-        rootLink.parent = robotRoot;
+    const childLinks = new Set(joints.map(j => j.child));
+    links.forEach(link => {
+      if (!childLinks.has(link.name)) {
+        const rootLink = linkMap[link.name];
+        if (rootLink) {
+          rootLink.parent = robotRoot;
+        }
       }
     });
 
   } catch (error) {
-    console.error('Error loading URDF file:', error);
+    console.error('Error loading URDF:', error);
     throw error;
   }
 }
-
