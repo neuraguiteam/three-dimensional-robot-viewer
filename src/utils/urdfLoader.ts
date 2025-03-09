@@ -15,10 +15,6 @@ interface JointInfo {
 interface LinkInfo {
   name: string;
   visual?: {
-    origin?: {
-      xyz?: string;
-      rpy?: string;
-    };
     geometry?: {
       mesh?: {
         filename?: string;
@@ -39,7 +35,7 @@ export async function loadURDFRobot(
     const parser = new DOMParser();
     const xmlDoc = parser.parseFromString(urdfContent, "text/xml");
 
-    // Parse joints first
+    // Parse joints and links
     const joints: JointInfo[] = Array.from(xmlDoc.getElementsByTagName('joint')).map(joint => ({
       name: joint.getAttribute('name') || '',
       type: joint.getAttribute('type') || '',
@@ -51,7 +47,6 @@ export async function loadURDFRobot(
       child: joint.getElementsByTagName('child')[0]?.getAttribute('link') || ''
     }));
 
-    // Parse links
     const links: LinkInfo[] = Array.from(xmlDoc.getElementsByTagName('link')).map(link => ({
       name: link.getAttribute('name') || '',
       visual: Array.from(link.getElementsByTagName('visual')).map(visual => ({
@@ -63,41 +58,52 @@ export async function loadURDFRobot(
       }))
     }));
 
-    // Create a root node for the robot
+    // Create root node for the robot
     const robotRoot = new BABYLON.TransformNode("robotRoot", scene);
     robotRoot.rotation = new BABYLON.Vector3(0, 0, Math.PI/2); // +Z up orientation
 
-    // Create a map to store mesh nodes by link name
+    // Create transform nodes for links and store them in a map
     const linkNodes = new Map<string, BABYLON.TransformNode>();
-
-    // Create transform nodes for all links
+    
+    // First pass: Create all link nodes
     for (const link of links) {
       const linkNode = new BABYLON.TransformNode(link.name, scene);
       linkNodes.set(link.name, linkNode);
     }
 
-    // Process joints to establish parent-child relationships and transformations
+    // Second pass: Process joints and establish parent-child relationships
     for (const joint of joints) {
-      const childNode = linkNodes.get(joint.child);
       const parentNode = linkNodes.get(joint.parent);
+      const childNode = linkNodes.get(joint.child);
 
-      if (childNode && parentNode) {
-        childNode.parent = parentNode;
+      if (parentNode && childNode) {
+        // Create a joint transform node
+        const jointNode = new BABYLON.TransformNode(`joint_${joint.name}`, scene);
+        jointNode.parent = parentNode;
 
-        // Apply joint origin transformation
+        // Apply joint origin transformation to the joint node
         if (joint.origin) {
-          // Parse position
-          const [x, y, z] = joint.origin.xyz?.split(' ').map(Number) || [0, 0, 0];
-          childNode.position = new BABYLON.Vector3(x, y, z);
+          // Position
+          if (joint.origin.xyz) {
+            const [x, y, z] = joint.origin.xyz.split(' ').map(Number);
+            jointNode.position = new BABYLON.Vector3(x, y, z);
+          }
 
-          // Parse rotation (RPY - Roll, Pitch, Yaw)
-          const [rx, ry, rz] = joint.origin.rpy?.split(' ').map(Number) || [0, 0, 0];
-          childNode.rotation = new BABYLON.Vector3(rx, ry, rz);
+          // Rotation (RPY - Roll, Pitch, Yaw)
+          if (joint.origin.rpy) {
+            const [roll, pitch, yaw] = joint.origin.rpy.split(' ').map(Number);
+            // Convert RPY to Euler angles in the correct order
+            const quaternion = BABYLON.Quaternion.RotationYawPitchRoll(yaw, pitch, roll);
+            jointNode.rotationQuaternion = quaternion;
+          }
         }
+
+        // Parent the child link to the joint transform
+        childNode.parent = jointNode;
       }
     }
 
-    // Load meshes for links
+    // Third pass: Load meshes and attach them to their respective link nodes
     for (const link of links) {
       if (link.visual && link.visual[0]?.geometry?.mesh?.filename) {
         const rawMeshPath = link.visual[0].geometry.mesh.filename;
@@ -118,11 +124,12 @@ export async function loadURDFRobot(
       }
     }
 
-    // Parent the root link to the robot root
+    // Parent the root link (Body) to the robot root
     const bodyNode = linkNodes.get('Body');
     if (bodyNode) {
       bodyNode.parent = robotRoot;
     }
+
   } catch (error) {
     console.error('Error loading URDF file:', error);
     throw error;
