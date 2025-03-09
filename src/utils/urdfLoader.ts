@@ -1,7 +1,6 @@
 
 import * as BABYLON from '@babylonjs/core';
 import { parseString } from 'xml2js';
-import { promisify } from 'util';
 
 interface JointInfo {
   name: string;
@@ -29,9 +28,6 @@ interface LinkInfo {
   };
 }
 
-// Convert parseString to Promise-based function
-const parseXML = promisify(parseString);
-
 export async function loadURDFRobot(
   scene: BABYLON.Scene,
   urdfPath: string,
@@ -41,7 +37,14 @@ export async function loadURDFRobot(
     const response = await fetch(urdfPath);
     const urdfContent = await response.text();
 
-    const result = await parseXML(urdfContent);
+    // Use parseString with a Promise wrapper instead of util.promisify
+    const result = await new Promise((resolve, reject) => {
+      parseString(urdfContent, (err, result) => {
+        if (err) reject(err);
+        else resolve(result);
+      });
+    });
+
     const robot = result.robot;
     const links: LinkInfo[] = robot.link;
     const joints: JointInfo[] = robot.joint;
