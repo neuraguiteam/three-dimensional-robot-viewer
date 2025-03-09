@@ -7,14 +7,18 @@ import { URDFLink, URDFJoint } from './urdfTypes';
 const meshCache: { [key: string]: Promise<BABYLON.ISceneLoaderAsyncResult> } = {};
 
 function rpyToQuaternion(roll: number, pitch: number, yaw: number): BABYLON.Quaternion {
-  return BABYLON.Quaternion.RotationYawPitchRoll(yaw, pitch, roll);
+  // Create rotation matrix from RPY
+  const rotation = BABYLON.Matrix.RotationYawPitchRoll(yaw, pitch, roll);
+  // Convert to quaternion
+  const quaternion = BABYLON.Quaternion.FromRotationMatrix(rotation);
+  return quaternion;
 }
 
 function buildRobotStructure(scene: BABYLON.Scene, links: URDFLink[], joints: URDFJoint[]) {
   const linkMap = new Map<string, BABYLON.TransformNode>();
   const jointMap = new Map<string, BABYLON.TransformNode>();
 
-  // First create all link nodes
+  // First create all link nodes with their origins
   links.forEach(link => {
     const node = new BABYLON.TransformNode(link.name, scene);
     linkMap.set(link.name, node);
@@ -33,13 +37,21 @@ function buildRobotStructure(scene: BABYLON.Scene, links: URDFLink[], joints: UR
       return;
     }
 
-    // Set up hierarchy: parentLink -> jointNode -> childLink
+    // Set joint's parent to parent link
     jointNode.parent = parentLink;
+    
+    // Set child link's parent to joint
     childLink.parent = jointNode;
 
-    // Apply joint transforms
+    // Apply joint origin transform
     jointNode.position = new BABYLON.Vector3(joint.xyz[0], joint.xyz[1], joint.xyz[2]);
     jointNode.rotationQuaternion = rpyToQuaternion(joint.rpy[0], joint.rpy[1], joint.rpy[2]);
+
+    // If joint has an axis, store it for articulation
+    if (joint.axis) {
+      const axisVector = new BABYLON.Vector3(joint.axis[0], joint.axis[1], joint.axis[2]);
+      (jointNode as any).jointAxis = axisVector;
+    }
   });
 
   return { linkMap, jointMap };
@@ -55,18 +67,26 @@ export async function loadURDFRobot(
     const urdfContent = await response.text();
     const { links, joints } = await parseURDF(urdfContent);
 
+    // Create root node for the entire robot
     const robotRoot = new BABYLON.TransformNode("robotRoot", scene);
+    
+    // Set initial robot position and orientation
+    robotRoot.position = new BABYLON.Vector3(0, 2, 0); // Lift robot above ground
+    robotRoot.rotation = new BABYLON.Vector3(0, Math.PI / 4, 0); // Rotate 45 degrees
+
     const { linkMap } = buildRobotStructure(scene, links, joints);
 
-    // Find and attach root links
+    // Find root links (links that aren't children in any joint)
     const childLinks = new Set(joints.map(j => j.child));
     const rootLinks = links.filter(link => !childLinks.has(link.name));
+
+    // Attach root links to robot root
     rootLinks.forEach(rootLink => {
       const rootNode = linkMap.get(rootLink.name);
       if (rootNode) rootNode.parent = robotRoot;
     });
 
-    // Load meshes concurrently
+    // Load meshes for visual elements
     const meshPromises: Promise<void>[] = [];
 
     links.forEach(link => {
@@ -79,12 +99,10 @@ export async function loadURDFRobot(
         visualNode.rotationQuaternion = rpyToQuaternion(visual.rpy[0], visual.rpy[1], visual.rpy[2]);
         visualNode.parent = linkNode;
 
-        // Fix the mesh path by correctly joining the baseUrl and meshPath
         const meshPath = visual.filename.replace('../', '');
         const fullPath = `${baseUrl}/${meshPath}`;
 
         if (!meshCache[fullPath]) {
-          // Split the path into rootUrl and sceneFilename for SceneLoader
           const lastSlashIndex = fullPath.lastIndexOf('/');
           const rootUrl = fullPath.substring(0, lastSlashIndex + 1);
           const sceneFilename = fullPath.substring(lastSlashIndex + 1);
@@ -102,6 +120,8 @@ export async function loadURDFRobot(
 
           if (mesh instanceof BABYLON.Mesh) {
             const material = new BABYLON.StandardMaterial(`${link.name}_material`, scene);
+            material.diffuseColor = new BABYLON.Color3(0.7, 0.7, 0.7);
+            material.specularColor = new BABYLON.Color3(0.2, 0.2, 0.2);
             material.backFaceCulling = false;
             mesh.material = material;
           }
@@ -119,4 +139,3 @@ export async function loadURDFRobot(
     throw error;
   }
 }
-
