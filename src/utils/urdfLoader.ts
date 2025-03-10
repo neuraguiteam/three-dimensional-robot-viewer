@@ -1,9 +1,37 @@
+
 import * as BABYLON from '@babylonjs/core';
 import { parseURDF } from './urdfParser';
 import { URDFLink, URDFJoint } from './urdfTypes';
 
 function rpyToQuaternion(roll: number, pitch: number, yaw: number): BABYLON.Quaternion {
   return BABYLON.Quaternion.FromEulerAngles(roll, pitch, yaw);
+}
+
+function createJointConstraint(joint: URDFJoint, jointNode: BABYLON.TransformNode, scene: BABYLON.Scene) {
+  if (!joint.axis) return;
+
+  const axis = new BABYLON.Vector3(joint.axis[0], joint.axis[1], joint.axis[2]);
+  
+  switch (joint.type.toLowerCase()) {
+    case 'revolute':
+    case 'continuous':
+      // Create a hinge constraint for revolute joints
+      const hingeJoint = new BABYLON.HingeJoint({
+        mainPivot: new BABYLON.Vector3(0, 0, 0),
+        connectedPivot: new BABYLON.Vector3(0, 0, 0),
+        mainAxis: axis,
+        connectedAxis: axis,
+      });
+      break;
+    case 'prismatic':
+      // Create a slider constraint for prismatic joints
+      const sliderJoint = new BABYLON.SliderJoint({
+        mainAxis: axis,
+        connectedAxis: axis,
+      });
+      break;
+    // Add more joint types as needed
+  }
 }
 
 export async function loadURDFRobot(
@@ -23,12 +51,14 @@ export async function loadURDFRobot(
     // First pass: Create all link nodes
     links.forEach(link => {
       const linkNode = new BABYLON.TransformNode(link.name, scene);
+      linkNode.id = link.name;  // Set ID for easier debugging
       linkMap.set(link.name, linkNode);
     });
 
     // Second pass: Create joints and establish hierarchy
     joints.forEach(joint => {
       const jointNode = new BABYLON.TransformNode(joint.name, scene);
+      jointNode.id = joint.name;  // Set ID for easier debugging
       jointMap.set(joint.name, jointNode);
 
       // Set joint position and rotation from joint origin
@@ -41,6 +71,11 @@ export async function loadURDFRobot(
       if (parentLink && childLink) {
         jointNode.parent = parentLink;
         childLink.parent = jointNode;
+
+        // Create joint constraint based on joint type and axis
+        createJointConstraint(joint, jointNode, scene);
+      } else {
+        console.warn(`Missing parent or child link for joint ${joint.name}`);
       }
     });
 
@@ -58,7 +93,10 @@ export async function loadURDFRobot(
     // Load meshes for each link
     for (const link of links) {
       const linkNode = linkMap.get(link.name);
-      if (!linkNode) continue;
+      if (!linkNode) {
+        console.warn(`Missing node for link ${link.name}`);
+        continue;
+      }
 
       for (const visual of link.visuals) {
         const visualNode = new BABYLON.TransformNode(`${link.name}_visual`, scene);
