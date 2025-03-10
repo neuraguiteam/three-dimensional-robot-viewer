@@ -261,14 +261,14 @@ export class BabylonURDFLoader {
     }
 
     if (path.startsWith('../')) {
-      return `${this.options.workingPath}/${path.substring(3)}`;
+      return `${this.options.workingPath}${path}`.replace(/\/+/g, '/');
     }
 
     if (path.startsWith('http') || path.startsWith('/')) {
       return path;
     }
 
-    return `${this.options.workingPath}/${path}`;
+    return `${this.options.workingPath}/${path}`.replace(/\/+/g, '/');
   }
 
   private assembleRobot(): BABYLON.TransformNode {
