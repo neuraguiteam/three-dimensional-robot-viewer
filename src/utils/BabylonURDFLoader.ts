@@ -1,4 +1,3 @@
-
 import * as BABYLON from '@babylonjs/core';
 import { URDFLink, URDFJoint, URDFLinkVisual, URDFJointLimits } from './urdfTypes';
 
@@ -10,7 +9,7 @@ interface LoaderOptions {
   fetchOptions?: RequestInit;
 }
 
-export class URDFLoader {
+export class BabylonURDFLoader {
   private scene: BABYLON.Scene;
   private options: LoaderOptions;
   private linkMap: Map<string, BABYLON.TransformNode>;
@@ -73,7 +72,8 @@ export class URDFLoader {
       if (colorEl) {
         const rgba = colorEl.getAttribute('rgba')?.split(' ').map(Number) || [1, 1, 1, 1];
         pbr = new BABYLON.PBRMaterial(name, this.scene);
-        pbr.albedoColor = new BABYLON.Color4(rgba[0], rgba[1], rgba[2], rgba[3]);
+        // Fix: Use Color3 for albedoColor
+        pbr.albedoColor = new BABYLON.Color3(rgba[0], rgba[1], rgba[2]);
       } else if (textureEl) {
         const filename = textureEl.getAttribute('filename');
         if (filename) {

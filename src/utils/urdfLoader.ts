@@ -1,6 +1,6 @@
 
 import * as BABYLON from '@babylonjs/core';
-import { URDFLoader } from './URDFLoader';
+import { BabylonURDFLoader } from './BabylonURDFLoader';
 
 export async function loadURDFRobot(
   scene: BABYLON.Scene,
@@ -8,7 +8,7 @@ export async function loadURDFRobot(
   baseUrl: string
 ): Promise<void> {
   try {
-    const loader = new URDFLoader(scene, {
+    const loader = new BabylonURDFLoader(scene, {
       parseVisual: true,
       parseCollision: false,
       workingPath: baseUrl,
