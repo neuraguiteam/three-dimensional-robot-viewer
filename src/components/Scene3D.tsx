@@ -61,9 +61,9 @@ const Scene3D = ({ onSceneReady }: Scene3DProps) => {
       gridMaterial.lineColor = new BABYLON.Color3(0.4, 0.4, 0.4);
       grid.material = gridMaterial;
 
-      // Load URDF Robot
+      // Load URDF Robot with correct path
       try {
-        await loadURDFRobot(scene, "urdf/T12/T12.URDF", "urdf/T12");
+        await loadURDFRobot(scene, "urdf/T12/T12.URDF", "urdf/T12/");
       } catch (error) {
         console.error("Error loading URDF:", error);
       }

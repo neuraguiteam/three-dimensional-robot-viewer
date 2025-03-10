@@ -72,7 +72,6 @@ export class BabylonURDFLoader {
       if (colorEl) {
         const rgba = colorEl.getAttribute('rgba')?.split(' ').map(Number) || [1, 1, 1, 1];
         pbr = new BABYLON.PBRMaterial(name, this.scene);
-        // Fix: Use Color3 for albedoColor
         pbr.albedoColor = new BABYLON.Color3(rgba[0], rgba[1], rgba[2]);
       } else if (textureEl) {
         const filename = textureEl.getAttribute('filename');
@@ -260,7 +259,16 @@ export class BabylonURDFLoader {
         return `${packagePath}/${rest.join('/')}`;
       }
     }
-    return path.startsWith('http') ? path : `${this.options.workingPath || ''}${path}`;
+
+    if (path.startsWith('../')) {
+      return `${this.options.workingPath}/${path.substring(3)}`;
+    }
+
+    if (path.startsWith('http') || path.startsWith('/')) {
+      return path;
+    }
+
+    return `${this.options.workingPath}/${path}`;
   }
 
   private assembleRobot(): BABYLON.TransformNode {
