@@ -1,4 +1,3 @@
-
 import * as BABYLON from '@babylonjs/core';
 import { parseURDF } from './urdfParser';
 import { URDFLink, URDFJoint } from './urdfTypes';
@@ -98,7 +97,7 @@ export async function loadURDFRobot(
     }
 
     // Set initial robot orientation
-    robotRoot.rotation = new BABYLON.Vector3(0, 0, Math.PI/2);
+    robotRoot.rotation = new BABYLON.Vector3(0, Math.PI, Math.PI/2);
 
   } catch (error) {
     console.error('Error loading URDF:', error);
