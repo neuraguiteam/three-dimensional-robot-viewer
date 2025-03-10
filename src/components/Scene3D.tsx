@@ -1,4 +1,3 @@
-
 import { useEffect, useRef } from 'react';
 import * as BABYLON from '@babylonjs/core';
 import { GridMaterial } from '@babylonjs/materials';
@@ -25,7 +24,11 @@ const Scene3D = ({ onSceneReady }: Scene3DProps) => {
       scene.clearColor = new BABYLON.Color4(0.05, 0.05, 0.05, 1);
       
       // Add debug layer (turned off by default)
-      scene.debugLayer.isVisible = false;
+      await scene.debugLayer.show({
+        embedMode: true,
+        handleResize: true,
+      });
+      scene.debugLayer.hide();
 
       // Camera setup
       const camera = new BABYLON.ArcRotateCamera(
