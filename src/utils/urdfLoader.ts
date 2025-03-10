@@ -11,7 +11,7 @@ export async function loadURDFRobot(
     const loader = new BabylonURDFLoader(scene, {
       parseVisual: true,
       parseCollision: false,
-      workingPath: baseUrl,
+      workingPath: baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`,
       packages: {}
     });
 

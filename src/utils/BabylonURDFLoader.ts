@@ -261,14 +261,23 @@ export class BabylonURDFLoader {
     }
 
     if (path.startsWith('../')) {
-      return `${this.options.workingPath}${path}`.replace(/\/+/g, '/');
+      const basePath = this.options.workingPath.endsWith('/') 
+        ? this.options.workingPath.slice(0, -1) 
+        : this.options.workingPath;
+      
+      const parentPath = basePath.split('/').slice(0, -1).join('/');
+      const relativePath = path.substring(3); // Remove ../
+      return `${parentPath}/${relativePath}`.replace(/\/+/g, '/');
     }
 
     if (path.startsWith('http') || path.startsWith('/')) {
       return path;
     }
 
-    return `${this.options.workingPath}/${path}`.replace(/\/+/g, '/');
+    const basePath = this.options.workingPath.endsWith('/') 
+      ? this.options.workingPath 
+      : `${this.options.workingPath}/`;
+    return `${basePath}${path}`.replace(/\/+/g, '/');
   }
 
   private assembleRobot(): BABYLON.TransformNode {
