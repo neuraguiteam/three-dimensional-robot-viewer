@@ -1,3 +1,4 @@
+
 import { useEffect, useRef } from 'react';
 import * as BABYLON from '@babylonjs/core';
 import { GridMaterial } from '@babylonjs/materials';
@@ -16,20 +17,23 @@ const Scene3D = ({ onSceneReady }: Scene3DProps) => {
     if (!canvasRef.current) return;
 
     const canvas = canvasRef.current;
-    const engine = new BABYLON.Engine(canvas, true);
+    const engine = new BABYLON.Engine(canvas, true, { stencil: true });
     engineRef.current = engine;
 
     const createScene = async () => {
       const scene = new BABYLON.Scene(engine);
       scene.clearColor = new BABYLON.Color4(0.05, 0.05, 0.05, 1);
+      
+      // Add debug layer (turned off by default)
+      scene.debugLayer.isVisible = false;
 
       // Camera setup
       const camera = new BABYLON.ArcRotateCamera(
         "camera",
-        0,
-        Math.PI / 3,
+        Math.PI/2,
+        Math.PI/3,
         10,
-        BABYLON.Vector3.Zero(),
+        new BABYLON.Vector3(0, 1, 0),
         scene
       );
       camera.attachControl(canvas, true);
@@ -44,6 +48,14 @@ const Scene3D = ({ onSceneReady }: Scene3DProps) => {
         scene
       );
       light.intensity = 0.7;
+      
+      // Add directional light for better shadows
+      const dirLight = new BABYLON.DirectionalLight(
+        "dirLight", 
+        new BABYLON.Vector3(-1, -2, -1), 
+        scene
+      );
+      dirLight.intensity = 0.5;
 
       // Grid
       const gridSize = 20;
@@ -63,10 +75,23 @@ const Scene3D = ({ onSceneReady }: Scene3DProps) => {
 
       // Load URDF Robot
       try {
+        console.log("Starting URDF robot loading...");
         await loadURDFRobot(scene, "urdf/T12/T12.URDF", "urdf/T12");
+        console.log("URDF robot loading completed");
       } catch (error) {
         console.error("Error loading URDF:", error);
       }
+
+      // Add Inspector key (press 'I' to show/hide)
+      window.addEventListener('keydown', (ev) => {
+        if (ev.key === 'i') {
+          if (scene.debugLayer.isVisible()) {
+            scene.debugLayer.hide();
+          } else {
+            scene.debugLayer.show();
+          }
+        }
+      });
 
       if (onSceneReady) {
         onSceneReady(scene);
@@ -75,7 +100,10 @@ const Scene3D = ({ onSceneReady }: Scene3DProps) => {
       return scene;
     };
 
-    createScene();
+    let scene: BABYLON.Scene;
+    createScene().then(createdScene => {
+      scene = createdScene;
+    });
 
     engine.runRenderLoop(() => {
       if (engineRef.current?.scenes[0]) {
