@@ -1,6 +1,4 @@
 
-import * as BABYLON from '@babylonjs/core';
-
 export interface URDFLinkVisual {
   filename: string;
   scale?: [number, number, number];
@@ -13,6 +11,13 @@ export interface URDFLink {
   visuals: URDFLinkVisual[];
 }
 
+export interface URDFJointLimits {
+  lower: number;
+  upper: number;
+  effort?: number;
+  velocity?: number;
+}
+
 export interface URDFJoint {
   name: string;
   type: string;
@@ -21,5 +26,5 @@ export interface URDFJoint {
   xyz: [number, number, number];
   rpy: [number, number, number];
   axis?: [number, number, number];
+  limits?: URDFJointLimits;
 }
-

@@ -7,30 +7,56 @@ function rpyToQuaternion(roll: number, pitch: number, yaw: number): BABYLON.Quat
   return BABYLON.Quaternion.FromEulerAngles(roll, pitch, yaw);
 }
 
-function createJointConstraint(joint: URDFJoint, jointNode: BABYLON.TransformNode, scene: BABYLON.Scene) {
+function createJointConstraint(joint: URDFJoint, jointNode: BABYLON.TransformNode, parentNode: BABYLON.TransformNode, scene: BABYLON.Scene) {
   if (!joint.axis) return;
 
   const axis = new BABYLON.Vector3(joint.axis[0], joint.axis[1], joint.axis[2]);
+  axis.normalize();
   
   switch (joint.type.toLowerCase()) {
     case 'revolute':
-    case 'continuous':
+    case 'continuous': {
       // Create a hinge constraint for revolute joints
-      const hingeJoint = new BABYLON.HingeJoint({
+      const hinge = new BABYLON.HingeJoint({
         mainPivot: new BABYLON.Vector3(0, 0, 0),
         connectedPivot: new BABYLON.Vector3(0, 0, 0),
         mainAxis: axis,
         connectedAxis: axis,
       });
+      
+      // Set joint limits for revolute joints
+      if (joint.type === 'revolute' && joint.limits) {
+        const physicsJoint = new BABYLON.PhysicsJoint(BABYLON.PhysicsJoint.HingeJoint, {
+          mainPivot: new BABYLON.Vector3(0, 0, 0),
+          connectedPivot: new BABYLON.Vector3(0, 0, 0),
+          mainAxis: axis,
+          connectedAxis: axis,
+          nativeParams: {
+            limit: {
+              low: joint.limits.lower,
+              high: joint.limits.upper
+            }
+          }
+        });
+      }
       break;
-    case 'prismatic':
-      // Create a slider constraint for prismatic joints
-      const sliderJoint = new BABYLON.SliderJoint({
-        mainAxis: axis,
-        connectedAxis: axis,
-      });
+    }
+    case 'prismatic': {
+      // For prismatic joints, we'll use a custom TransformNode to handle linear motion
+      const prismaticNode = new BABYLON.TransformNode(`${joint.name}_prismatic`, scene);
+      prismaticNode.parent = parentNode;
+      
+      // Store the axis for animation/interaction
+      (prismaticNode as any).slidingAxis = axis;
+      
+      if (joint.limits) {
+        (prismaticNode as any).limits = {
+          lower: joint.limits.lower || 0,
+          upper: joint.limits.upper || 0
+        };
+      }
       break;
-    // Add more joint types as needed
+    }
   }
 }
 
@@ -51,14 +77,14 @@ export async function loadURDFRobot(
     // First pass: Create all link nodes
     links.forEach(link => {
       const linkNode = new BABYLON.TransformNode(link.name, scene);
-      linkNode.id = link.name;  // Set ID for easier debugging
+      linkNode.id = link.name;
       linkMap.set(link.name, linkNode);
     });
 
     // Second pass: Create joints and establish hierarchy
     joints.forEach(joint => {
       const jointNode = new BABYLON.TransformNode(joint.name, scene);
-      jointNode.id = joint.name;  // Set ID for easier debugging
+      jointNode.id = joint.name;
       jointMap.set(joint.name, jointNode);
 
       // Set joint position and rotation from joint origin
@@ -72,8 +98,24 @@ export async function loadURDFRobot(
         jointNode.parent = parentLink;
         childLink.parent = jointNode;
 
+        // Store joint axis information on the node for later use
+        if (joint.axis) {
+          (jointNode as any).jointAxis = new BABYLON.Vector3(
+            joint.axis[0],
+            joint.axis[1],
+            joint.axis[2]
+          ).normalize();
+          (jointNode as any).jointType = joint.type;
+          if (joint.limits) {
+            (jointNode as any).jointLimits = {
+              lower: joint.limits.lower,
+              upper: joint.limits.upper
+            };
+          }
+        }
+
         // Create joint constraint based on joint type and axis
-        createJointConstraint(joint, jointNode, scene);
+        createJointConstraint(joint, jointNode, parentLink, scene);
       } else {
         console.warn(`Missing parent or child link for joint ${joint.name}`);
       }
