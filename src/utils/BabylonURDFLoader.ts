@@ -260,14 +260,13 @@ export class BabylonURDFLoader {
       }
     }
 
-    if (path.startsWith('../')) {
+    // If path starts with ../meshes, we need to resolve it relative to the URDF file
+    if (path.startsWith('../meshes/')) {
+      const meshPath = path.replace('../meshes/', 'meshes/');
       const basePath = this.options.workingPath.endsWith('/') 
-        ? this.options.workingPath.slice(0, -1) 
-        : this.options.workingPath;
-      
-      const parentPath = basePath.split('/').slice(0, -1).join('/');
-      const relativePath = path.substring(3); // Remove ../
-      return `${parentPath}/${relativePath}`.replace(/\/+/g, '/');
+        ? this.options.workingPath 
+        : `${this.options.workingPath}/`;
+      return `${basePath}${meshPath}`.replace(/\/+/g, '/');
     }
 
     if (path.startsWith('http') || path.startsWith('/')) {
